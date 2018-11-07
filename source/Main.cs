@@ -112,7 +112,8 @@ namespace ExtraOptions
 
                 DevConsole.disableConsole = !currentConfig.Console;
 
-                UnityEngine.Object.FindObjectOfType<WaterSunShaftsOnCamera>().enabled = currentConfig.LightShafts;
+                foreach (var s in UnityEngine.Object.FindObjectsOfType<WaterSunShaftsOnCamera>())
+                    s.enabled = currentConfig.LightShafts;
 
                 Time.matchFixedTimeToDeltaTime = currentConfig.VariablePhysicsStep;
                 if (!Time.matchFixedTimeToDeltaTime)
