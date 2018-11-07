@@ -78,7 +78,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy $(TargetDir)$(ProjectName).dll $(SolutionDir)..\$(ProjectName).dll
-copy $(TargetDir)mod.json $(SolutionDir)..\mod.json</PostBuildEvent>
+    <PostBuildEvent>copy "$(TargetDir)$(ProjectName).dll" "$(SolutionDir)..\$(ProjectName).dll"
+copy "$(TargetDir)mod.json" "$(SolutionDir)..\mod.json"</PostBuildEvent>
   </PropertyGroup>
 </Project>
