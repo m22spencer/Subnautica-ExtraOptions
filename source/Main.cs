@@ -14,10 +14,10 @@ namespace ExtraOptions
     class Config
     {
         public float Murkiness = 100.0f;
-        public int TextureQuality = 3;
-        public bool Console = false;
-        public bool LightShafts = true;
-        public bool VariablePhysicsStep = true;
+        public int   TextureQuality = 3;
+        public bool  Console = false;
+        public bool  LightShafts = true;
+        public bool  VariablePhysicsStep = true;
     }
 
     class Main
@@ -84,11 +84,11 @@ namespace ExtraOptions
 
         public static void AddGraphicsTab_Prefix(uGUI_OptionsPanel __instance)
         {
-            t = __instance;
+            var t = __instance;
             var idx = t.AddTab("ExtraOptions");
 
             t.AddSliderOption(idx, "Murkiness", currentConfig.Murkiness, 0, 200, 100, new UnityAction<float>(v => { currentConfig.Murkiness = v; Reload(); }));
-            t.AddChoiceOption(idx, "Texture Quality", new int[] { 0, 1, 2, 3, 4 }, 3, new UnityAction<int>(v => { currentConfig.TextureQuality = v; Reload(); }));
+            t.AddChoiceOption(idx, "Texture Quality", new int[] { 0, 1, 2, 3, 4 }, currentConfig.TextureQuality, new UnityAction<int>(v => { currentConfig.TextureQuality = v; Reload(); }));
             t.AddToggleOption(idx, "Console", currentConfig.Console, new UnityAction<bool>(v => { currentConfig.Console = v; Reload(); }));
             t.AddToggleOption(idx, "LightShaft", currentConfig.LightShafts, new UnityAction<bool>(v => { currentConfig.LightShafts = v; Reload(); }));
             t.AddToggleOption(idx, "Variable Physics Step", currentConfig.VariablePhysicsStep, new UnityAction<bool>(v => { currentConfig.VariablePhysicsStep = v; Reload(); }));
