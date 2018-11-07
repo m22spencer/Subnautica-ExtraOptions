@@ -1,0 +1,10 @@
+{ "Id" : "ExtraOptions"
+, "DisplayName" : "ExtraOptions"
+, "Author" : "m22spencer"
+, "Version" : "0.0.1"
+, "Requires": [ "0Harmony.dll" ]
+, "Enable" : true
+, "AssemblyName" : "ExtraOptions.dll"
+, "EntryMethod"  : "ExtraOptions.Main.Patch"
+, "Priority"     : "Last"
+}
