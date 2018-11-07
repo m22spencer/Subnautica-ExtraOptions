@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Reflection;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -25,61 +27,106 @@ namespace ExtraOptions
         static HarmonyInstance harmony;
         static readonly string configPath = @"./QMods/ExtraOptions/config.json";
         public static Config currentConfig;
+        static readonly string logPath = @"./QMods/ExtraOptions/ExtraOptions.log";
+        static bool hasError = false;
+        static bool hasShownError = false;
+
         public static void Patch()
+        {
+            File.WriteAllText(logPath, "");
+            try
+            {
+                Info("Harmony? {0}", Assembly.GetAssembly(typeof(HarmonyInstance)).GetName().Version);
+                Info("Unity? {0}", UnityEngine.Application.unityVersion);
+                Info("Product? {0}-{1}", UnityEngine.Application.productName, UnityEngine.Application.version);
+                Info("ExtraOptions-{0}", Assembly.GetExecutingAssembly().GetName().Version);
+
+                LoadSettings();
+                
+                harmony = HarmonyInstance.Create("com.m22spencer.extraoptions");
+                harmony.Patch(AccessTools.Method(typeof(MainMenuController), "Start")
+                             , null
+                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(Reload))));
+                // When a preset is selected, the texture quality is also set, reload settings here to override this
+                harmony.Patch(AccessTools.Method(typeof(uGUI_OptionsPanel), "SyncQualityPresetSelection")
+                             , null
+                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(Reload))));
+
+                harmony.Patch(AccessTools.Method(typeof(uGUI_OptionsPanel), "AddGraphicsTab")
+                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(AddGraphicsTab_Prefix)))
+                             , null);
+
+                harmony.Patch(AccessTools.Method(typeof(WaterscapeVolume.Settings), "GetExtinctionAndScatteringCoefficients")
+                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_GetExtinctionAndScatteringCoefficients)))
+                             , null);
+            } catch(Exception e)
+            {
+                Error("Patching failed with: {0}\n", e);
+            }
+        }
+
+        public static void Info(string fmt, params object[] items)
+        {
+            File.AppendAllText(logPath, "[INFO] " + string.Format(fmt, items) + "\n");
+        }
+
+        public static void Error(string fmt, params object[] items)
+        {
+            hasError = true;
+            File.AppendAllText(logPath, "[ERROR] " + string.Format(fmt, items) + "\n");
+        }
+
+        public static void LoadSettings()
         {
             var json = File.Exists(configPath) ? File.ReadAllText(configPath) : "{}";
             currentConfig = JsonConvert.DeserializeObject<Config>(json);
-
-            harmony = HarmonyInstance.Create("com.m22spencer.extraoptions");
-            harmony.Patch(AccessTools.Method(typeof(uGUI_OptionsPanel), "AddGraphicsTab")
-                            , new HarmonyMethod(typeof(Main).GetMethod(nameof(AddGraphicsTab_Prefix)))
-                            , null);
-
-            // When a preset is selected, the texture quality is also set, reload settings here to override this
-            harmony.Patch(AccessTools.Method(typeof(uGUI_OptionsPanel), "SyncQualityPresetSelection")
-                         , null
-                         , new HarmonyMethod(typeof(Main).GetMethod(nameof(Reload))));
-            harmony.Patch(AccessTools.Method(typeof(MainMenuController), "Start")
-                         , null
-                         , new HarmonyMethod(typeof(Main).GetMethod(nameof(Reload))));
-
-            harmony.Patch(AccessTools.Method(typeof(WaterscapeVolume.Settings), "GetExtinctionAndScatteringCoefficients")
-                         , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_GetExtinctionAndScatteringCoefficients)))
-                         , null);
         }
 
-        public static Dictionary<string,object> LoadSettings()
+        public static void SaveSettings()
         {
-            var json = File.Exists(configPath) ? File.ReadAllText(configPath) : "{}";
-            return JsonConvert.DeserializeObject<Dictionary<string,object>>(json);
+            File.WriteAllText(configPath, JsonConvert.SerializeObject(currentConfig));
         }
 
-        public static void SaveSettings(Dictionary<string,object> d)
+        public static void TryAlertUser()
         {
-            var json = JsonConvert.SerializeObject(d);
-            File.WriteAllText(configPath, json);
+            try
+            {
+                if (hasError && !hasShownError)
+                {
+                    hasShownError = true;
+                    Subtitles.main.Add("ExtraOptions error, check QMods/ExtraOptions/ExtraOptions.log for more information");
+                }
+            }
+            catch { }
         }
 
         public static void Reload()
         {
-            foreach (var w in GameObject.FindObjectsOfType<WaterBiomeManager>())
-                w.Rebuild();
-
-            QualitySettings.masterTextureLimit = 4 - currentConfig.TextureQuality;
-
-            DevConsole.disableConsole = !currentConfig.Console;
-
-            UnityEngine.Object.FindObjectOfType<WaterSunShaftsOnCamera>().enabled = currentConfig.LightShafts;
-
-            Time.matchFixedTimeToDeltaTime = currentConfig.VariablePhysicsStep;
-            if (!Time.matchFixedTimeToDeltaTime)
+            TryAlertUser();   
+            try
             {
-                Time.fixedDeltaTime = 0.02f;
-                Time.maximumDeltaTime = 0.33333f;
-                Time.maximumParticleDeltaTime = 0.03f;
-            }
+                foreach (var w in GameObject.FindObjectsOfType<WaterBiomeManager>())
+                    w.Rebuild();
 
-            File.WriteAllText(configPath, JsonConvert.SerializeObject(currentConfig));
+                QualitySettings.masterTextureLimit = 4 - currentConfig.TextureQuality;
+
+                DevConsole.disableConsole = !currentConfig.Console;
+
+                UnityEngine.Object.FindObjectOfType<WaterSunShaftsOnCamera>().enabled = currentConfig.LightShafts;
+
+                Time.matchFixedTimeToDeltaTime = currentConfig.VariablePhysicsStep;
+                if (!Time.matchFixedTimeToDeltaTime)
+                {
+                    Time.fixedDeltaTime = 0.02f;
+                    Time.maximumDeltaTime = 0.33333f;
+                    Time.maximumParticleDeltaTime = 0.03f;
+                }
+
+                SaveSettings();
+            } catch(Exception e)
+            {
+                Error("Reload failed with: {0}\n", e);
+            }
         }
 
         public static void AddGraphicsTab_Prefix(uGUI_OptionsPanel __instance)
