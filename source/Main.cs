@@ -34,6 +34,8 @@ namespace ExtraOptions
             harmony.Patch(AccessTools.Method(typeof(uGUI_OptionsPanel), "AddGraphicsTab")
                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(AddGraphicsTab_Prefix)))
                             , null);
+
+            // When a preset is selected, the texture quality is also set, reload settings here to override this
             harmony.Patch(AccessTools.Method(typeof(uGUI_OptionsPanel), "SyncQualityPresetSelection")
                          , null
                          , new HarmonyMethod(typeof(Main).GetMethod(nameof(Reload))));
@@ -42,8 +44,8 @@ namespace ExtraOptions
                          , new HarmonyMethod(typeof(Main).GetMethod(nameof(Reload))));
 
             harmony.Patch(AccessTools.Method(typeof(WaterscapeVolume.Settings), "GetExtinctionAndScatteringCoefficients")
-                            , new HarmonyMethod(typeof(Main).GetMethod(nameof(GESC)))
-                            , null);
+                         , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_GetExtinctionAndScatteringCoefficients)))
+                         , null);
         }
 
         public static Dictionary<string,object> LoadSettings()
@@ -82,31 +84,22 @@ namespace ExtraOptions
 
         public static void AddGraphicsTab_Prefix(uGUI_OptionsPanel __instance)
         {
-            // TODO: Need a reload function, which will apply these settings any time the items in the graphics options are modified.
-            try
-            {   var t = __instance;
-                var idx = t.AddTab("ExtraOptions");
+            t = __instance;
+            var idx = t.AddTab("ExtraOptions");
 
-                t.AddSliderOption(idx, "Murkiness", currentConfig.Murkiness, 0, 200, 100, new UnityAction<float>(v => { currentConfig.Murkiness = v; Reload(); }));
-
-                t.AddChoiceOption(idx, "Texture Quality", new int[] { 0, 1, 2, 3, 4 }, 3, new UnityAction<int>(v => { currentConfig.TextureQuality = v; Reload(); }));
-
-                t.AddToggleOption(idx, "Console", currentConfig.Console, new UnityAction<bool>(v => { currentConfig.Console = v; Reload(); }));
-
-                t.AddToggleOption(idx, "LightShaft", currentConfig.LightShafts, new UnityAction<bool>(v => { currentConfig.LightShafts = v; Reload(); }));
-
-                t.AddToggleOption(idx, "Variable Physics Step", currentConfig.VariablePhysicsStep, new UnityAction<bool>(v => { currentConfig.VariablePhysicsStep = v; Reload(); }));
-            } catch (Exception e)
-            {
-                Subtitles.main.Add(string.Format("ExtraOptions crashed with {0}", e));
-            }
+            t.AddSliderOption(idx, "Murkiness", currentConfig.Murkiness, 0, 200, 100, new UnityAction<float>(v => { currentConfig.Murkiness = v; Reload(); }));
+            t.AddChoiceOption(idx, "Texture Quality", new int[] { 0, 1, 2, 3, 4 }, 3, new UnityAction<int>(v => { currentConfig.TextureQuality = v; Reload(); }));
+            t.AddToggleOption(idx, "Console", currentConfig.Console, new UnityAction<bool>(v => { currentConfig.Console = v; Reload(); }));
+            t.AddToggleOption(idx, "LightShaft", currentConfig.LightShafts, new UnityAction<bool>(v => { currentConfig.LightShafts = v; Reload(); }));
+            t.AddToggleOption(idx, "Variable Physics Step", currentConfig.VariablePhysicsStep, new UnityAction<bool>(v => { currentConfig.VariablePhysicsStep = v; Reload(); }));
         }
 
-        public static bool GESC(WaterscapeVolume.Settings __instance, ref Vector4 __result)
+        // Ref - https://forums.unknownworlds.com/discussion/154099/mod-pc-murky-waters-v2-with-dll-patcher-wip
+        public static bool Patch_GetExtinctionAndScatteringCoefficients(WaterscapeVolume.Settings __instance, ref Vector4 __result)
         {
             var t = __instance;
             var m = 1.0f - Mathf.Clamp(currentConfig.Murkiness / 200.0f, 0.0f, 1.0f);
-            var mv = m * 190.0f + 10.0f;
+            var mv = m * 180.0f + 10.0f;
             float d = t.murkiness / mv;
             Vector3 vector = t.absorption + t.scattering * Vector3.one;
             __result = new Vector4(vector.x, vector.y, vector.z, t.scattering) * d;
