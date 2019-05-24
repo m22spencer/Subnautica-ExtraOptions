@@ -30,12 +30,17 @@ namespace ExtraOptions
         static readonly string logPath = @"./QMods/ExtraOptions/ExtraOptions.log";
         static bool hasError = false;
         static bool hasShownError = false;
+        static bool canLog = false;
 
         public static void Patch()
         {
-            File.WriteAllText(logPath, "");
             try
             {
+                File.WriteAllText(logPath, "");
+                canLog = true;
+            } catch {} // Possible permissions error, don't abort loading if we can't write the log file.
+
+            try {
                 Info("Harmony? {0}", Assembly.GetAssembly(typeof(HarmonyInstance)).GetName().Version);
                 Info("Unity? {0}", UnityEngine.Application.unityVersion);
                 Info("Product? {0}-{1}", UnityEngine.Application.productName, UnityEngine.Application.version);
@@ -67,13 +72,13 @@ namespace ExtraOptions
 
         public static void Info(string fmt, params object[] items)
         {
-            File.AppendAllText(logPath, "[INFO] " + string.Format(fmt, items) + "\n");
+            if (canLog) File.AppendAllText(logPath, "[INFO] " + string.Format(fmt, items) + "\n");
         }
 
         public static void Error(string fmt, params object[] items)
         {
             hasError = true;
-            File.AppendAllText(logPath, "[ERROR] " + string.Format(fmt, items) + "\n");
+            if (canLog) File.AppendAllText(logPath, "[ERROR] " + string.Format(fmt, items) + "\n");
         }
 
         public static void LoadSettings()
