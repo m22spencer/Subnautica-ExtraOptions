@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Reflection;
-using System.Diagnostics;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +9,7 @@ using UnityEngine.Events;
 using Oculus.Newtonsoft.Json;
 using Oculus.Newtonsoft.Json.Linq;
 using System.IO;
+using UnityEngine;
 
 namespace ExtraOptions
 {
@@ -39,7 +39,9 @@ namespace ExtraOptions
             {
                 File.WriteAllText(logPath, "");
                 canLog = true;
-            } catch {} // Possible permissions error, don't abort loading if we can't write the log file.
+            } catch {
+                Debug.LogError("[ExtraOptions] Unable to write ExtraOptions logfile.");
+            } // Possible permissions error, don't abort loading if we can't write the log file.
 
             try {
                 Info("Harmony? {0}", Assembly.GetAssembly(typeof(HarmonyInstance)).GetName().Version);
@@ -77,13 +79,17 @@ namespace ExtraOptions
 
         public static void Info(string fmt, params object[] items)
         {
-            if (canLog) File.AppendAllText(logPath, "[INFO] " + string.Format(fmt, items) + "\n");
+            var str = "[INFO] " + string.Format(fmt, items);
+            if (canLog) File.AppendAllText(logPath, str + "\n");
+            Debug.Log("[ExtraOptions] " + str);
         }
 
         public static void Error(string fmt, params object[] items)
         {
             hasError = true;
-            if (canLog) File.AppendAllText(logPath, "[ERROR] " + string.Format(fmt, items) + "\n");
+            var str = "[ERROR] " + string.Format(fmt, items);
+            if (canLog) File.AppendAllText(logPath, str + "\n");
+            Debug.LogError("[ExtraOptions] " + str);
         }
 
         public static void LoadSettings()
@@ -104,7 +110,8 @@ namespace ExtraOptions
                 if (hasError && !hasShownError)
                 {
                     hasShownError = true;
-                    Subtitles.main.Add("ExtraOptions error, check QMods/ExtraOptions/ExtraOptions.log for more information");
+                    var logpath = canLog ? "QMods/ExtraOptions/ExtraOptions.log" : "Subnautica_Data/output_log.txt";
+                    Subtitles.main.Add($"ExtraOptions error, check {logpath} for more information");
                 }
             }
             catch { }
