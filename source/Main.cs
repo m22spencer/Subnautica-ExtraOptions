@@ -20,6 +20,7 @@ namespace ExtraOptions
         public bool  Console = false;
         public bool  LightShafts = true;
         public bool  VariablePhysicsStep = true;
+        public bool  FogFix = false;
     }
 
     class Main
@@ -63,6 +64,10 @@ namespace ExtraOptions
 
                 harmony.Patch(AccessTools.Method(typeof(WaterscapeVolume.Settings), "GetExtinctionAndScatteringCoefficients")
                              , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_GetExtinctionAndScatteringCoefficients)))
+                             , null);
+
+                harmony.Patch( AccessTools.Method(typeof(WaterscapeVolume), nameof(WaterscapeVolume.RenderImage))
+                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_RenderImage)))
                              , null);
             } catch(Exception e)
             {
@@ -145,6 +150,7 @@ namespace ExtraOptions
             t.AddToggleOption(idx, "Console", currentConfig.Console, new UnityAction<bool>(v => { currentConfig.Console = v; Reload(); }));
             t.AddToggleOption(idx, "LightShaft", currentConfig.LightShafts, new UnityAction<bool>(v => { currentConfig.LightShafts = v; Reload(); }));
             t.AddToggleOption(idx, "Variable Physics Step", currentConfig.VariablePhysicsStep, new UnityAction<bool>(v => { currentConfig.VariablePhysicsStep = v; Reload(); }));
+            t.AddToggleOption(idx, "Fog \"Fix\"", currentConfig.FogFix, new UnityAction<bool>(v => { currentConfig.FogFix = v; Reload(); }));
         }
 
         // Ref - https://forums.unknownworlds.com/discussion/154099/mod-pc-murky-waters-v2-with-dll-patcher-wip
@@ -157,6 +163,11 @@ namespace ExtraOptions
             Vector3 vector = t.absorption + t.scattering * Vector3.one;
             __result = new Vector4(vector.x, vector.y, vector.z, t.scattering) * d;
             return false;
+        }
+
+        public static void Patch_RenderImage(ref bool cameraInside) {
+            if (currentConfig.FogFix)
+                cameraInside = false;
         }
     }
 }
