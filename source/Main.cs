@@ -10,8 +10,6 @@ using Oculus.Newtonsoft.Json;
 using Oculus.Newtonsoft.Json.Linq;
 using System.IO;
 using UnityEngine;
-using Harmony;
-using BiomeSettings = WaterBiomeManager.BiomeSettings;
 
 namespace ExtraOptions
 {
@@ -31,7 +29,6 @@ namespace ExtraOptions
         static readonly string configPath = @"./QMods/ExtraOptions/config.json";
         public static Config currentConfig;
         static readonly string logPath = @"./QMods/ExtraOptions/ExtraOptions.log";
-        static readonly string themesPath = @"./QMods/ExtraOptions/theme.json";
         static bool hasError = false;
         static bool hasShownError = false;
         static bool canLog = false;
@@ -74,14 +71,6 @@ namespace ExtraOptions
                 harmony.Patch( AccessTools.Method(typeof(WaterscapeVolume), nameof(WaterscapeVolume.RenderImage))
                              , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_RenderImage)))
                              , null);
-
-                try { 
-                harmony.Patch( AccessTools.Method(typeof(Player), "Update")
-                             , new HarmonyMethod(typeof(Main).GetMethod(nameof(Patch_PlayerUpdate)))
-                             , null);
-                } catch (Exception e) {
-                    Error("{0}", e);
-                }
             } catch(Exception e)
             {
                 Error("Patching failed with: {0}\n", e);
@@ -158,22 +147,6 @@ namespace ExtraOptions
             }
         }
 
-        public static WaterBiomeManager wbm;
-        public static BiomeSettings GetBiome(Player player = null) {
-            var pos = (player ?? GameObject.FindObjectOfType<Player>())?.gameObject?.transform?.position;
-            wbm = wbm ?? GameObject.FindObjectOfType<WaterBiomeManager>();
-
-            if (null != pos && wbm) {
-                return wbm.biomeSettings.FirstOrDefault(b => b.name == wbm.GetBiome(pos.Value));
-            }
-            return null;
-        }
-
-        public static JsonSerializerSettings themeJSS = new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore
-                                                                                   , DefaultValueHandling = DefaultValueHandling.Ignore
-                                                                                   , Converters = new JsonConverter[] { new ColorConverter()
-                                                                                                                      , new Vector3Converter() }};
-
         public static void AddGraphicsTab_Prefix(uGUI_OptionsPanel __instance)
         {
             var t = __instance;
@@ -185,89 +158,7 @@ namespace ExtraOptions
             t.AddToggleOption(idx, "LightShaft", currentConfig.LightShafts, new UnityAction<bool>(v => { currentConfig.LightShafts = v; Reload(); }));
             t.AddToggleOption(idx, "Variable Physics Step", currentConfig.VariablePhysicsStep, new UnityAction<bool>(v => { currentConfig.VariablePhysicsStep = v; Reload(); }));
             t.AddToggleOption(idx, "Fog \"Fix\"", currentConfig.FogFix, new UnityAction<bool>(v => { currentConfig.FogFix = v; Reload(); }));
-
-            var biome = GetBiome();
-            var name  = biome?.name ?? "???";
-            t.AddHeading(idx, $"Biome Config ({name})");
-            if (null != biome) {
-                Dictionary<string, WaterscapeVolume.Settings> themes;
-                if (File.Exists(themesPath)) themes = JsonConvert.DeserializeObject<Dictionary<string, WaterscapeVolume.Settings>>(File.ReadAllText(themesPath), themeJSS);
-                else themes = new Dictionary<string, WaterscapeVolume.Settings>();
-
-                if (themes.ContainsKey(name)) biome.settings = themes[name];
-                else themes[name] = biome.settings;
-
-                void Apply() {
-                    Info("Reloading");
-                    Reload();
-                    Info("Reloaded");
-                    var json = JsonConvert.SerializeObject(themes
-                                                          , Formatting.Indented
-                                                          , themeJSS);
-                    Info("serialized");
-                    File.WriteAllText(themesPath, json);
-                    Info("Written");
-                }
-
-                void AddVectorRawOption<T>(string fieldName, float min, float max, Func<T,Vector3> from, Func<Vector3,T> to) {
-                    float scale = 255f / (max - min);
-                    float nmin = min * scale;
-                    float nmax = max * scale;
-                    var fld = Traverse.Create(biome.settings).Field(fieldName);
-                    Func<Vector3> get = () => from(fld.GetValue<T>()) * scale;
-                    Action<Vector3> set = (iv) => fld.SetValue(to(iv / scale));
-                    t.AddSliderOption(idx, $"{fieldName}.x/r", get().x, nmin, nmax, get().x, new UnityAction<float>(v => { set(new Vector3(v, get().y, get().z)); Apply(); }));
-                    t.AddSliderOption(idx, $"{fieldName}.y/g", get().y, nmin, nmax, get().y, new UnityAction<float>(v => { set(new Vector3(get().x, v, get().z)); Apply(); }));
-                    t.AddSliderOption(idx, $"{fieldName}.z/b", get().z, nmin, nmax, get().z, new UnityAction<float>(v => { set(new Vector3(get().x, get().y, v)); Apply(); }));
-                }
-
-                void Vector(string fieldName, float min, float max) {
-                    AddVectorRawOption(fieldName, min, max, x => x, y => y);
-                }
-
-                void Color(string fieldName) {
-                    AddVectorRawOption<Color>(fieldName, 0, 1, xx => new Vector3(xx.r, xx.g, xx.b), yy => new Color(yy.x, yy.y, yy.z));
-                }
-
-                void Range(string fieldName, float min, float max) {
-                    float scale = 255f / (max - min);
-                    float nmin = min * scale;
-                    float nmax = max * scale;
-                    var fld = Traverse.Create(biome.settings).Field(fieldName);
-                    Func<float> get = () => fld.GetValue<float>() * scale;
-                    Action<float> set = (iv) => fld.SetValue(iv / scale);
-                    t.AddSliderOption(idx, $"{fieldName}", get(), nmin, nmax, get(), new UnityAction<float>(v => { set(v); Apply(); }));
-                }
-
-                Vector("absorption", 0, 200);
-                Range("scattering", 0, 2);
-                Color("scatteringColor");
-                Range("murkiness", 0.01568f, 1.0f);
-                Color("emissive");
-                Range("emissiveScale", 0, 1);
-                Range("startDistance", 0, 100);
-                Range("sunlightScale", 0, 1);
-                Range("ambientScale", 0, 1);
-            }
         }
-
-        public static string inBiome;
-        public static void Patch_PlayerUpdate(Player __instance) {
-            try {
-                var biome = GetBiome(__instance);
-                if (biome != null && biome.name != inBiome) {
-                    inBiome = biome.name;
-                    var themes = JsonConvert.DeserializeObject<Dictionary<string, WaterscapeVolume.Settings>>(File.ReadAllText(themesPath), themeJSS);
-                    if (themes.TryGetValue(biome.name, out var theme)) {
-                        biome.settings = theme;
-                        Reload();
-                    }
-                }
-            } catch (Exception e) {
-                Error("Player update issue: {0}", e);
-            }
-        }
-
 
         // Ref - https://forums.unknownworlds.com/discussion/154099/mod-pc-murky-waters-v2-with-dll-patcher-wip
         public static bool Patch_GetExtinctionAndScatteringCoefficients(WaterscapeVolume.Settings __instance, ref Vector4 __result)
@@ -285,37 +176,5 @@ namespace ExtraOptions
             if (currentConfig.FogFix)
                 cameraInside = false;
         }
-    }
-
-    public class ColorConverter : JsonConverter {
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            var c = (Color)value;
-            serializer.Serialize(writer, new float[3] { c.r, c.g, c.b });
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            float[] v = (float[])serializer.Deserialize(reader, typeof(float[]));
-            return new Color(v[0], v[1], v[2]);
-        }
-
-        public override bool CanConvert(Type objectType) => objectType == typeof(Color);
-    }
-
-    public class Vector3Converter : JsonConverter {
-        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
-        {
-            var c = (Vector3)value;
-            serializer.Serialize(writer, new float[3] { c.x, c.y, c.z });
-        }
-
-        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-        {
-            float[] v = (float[])serializer.Deserialize(reader, typeof(float[]));
-            return new Vector3(v[0], v[1], v[2]);
-        }
-
-        public override bool CanConvert(Type objectType) => objectType == typeof(Vector3);
     }
 }
