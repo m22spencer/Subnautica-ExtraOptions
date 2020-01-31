@@ -9,7 +9,6 @@ using UnityEngine.Events;
 using Oculus.Newtonsoft.Json;
 using Oculus.Newtonsoft.Json.Linq;
 using System.IO;
-using UnityEngine;
 
 namespace ExtraOptions
 {
